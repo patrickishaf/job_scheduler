@@ -13,6 +13,7 @@ type Job struct {
 	AttemptCount    int32
 	Error           string
 	IntervalMinutes int
+	LastAttemptAt   time.Time
 	Priority        int32
 	RetryCount      int32
 	ScheduledTime   time.Time

@@ -1,10 +1,12 @@
 package repository
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/patrickishaf/job_scheduler/config"
+	"github.com/patrickishaf/job_scheduler/internal/db/model"
 )
 
 type JobRepository struct {
@@ -19,4 +21,12 @@ func CreateJobRepository(cfg *config.AppConfig, pool *pgxpool.Pool, log *slog.Lo
 		connPool: pool,
 		logger:   log,
 	}
+}
+
+func (this *JobRepository) SaveOne(job *model.Job) (*model.Job, error) {
+	return nil, fmt.Errorf("method not implemented")
+}
+
+func (this *JobRepository) FindPendingJobs(job *model.Job) ([]model.Job, error) {
+	return nil, fmt.Errorf("method not implemented")
 }
