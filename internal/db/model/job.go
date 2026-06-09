@@ -14,6 +14,7 @@ type Job struct {
 	Error           string
 	IntervalMinutes int
 	LastAttemptAt   time.Time
+	Payload         map[string]any
 	Priority        int32
 	RetryCount      int32
 	ScheduledTime   time.Time

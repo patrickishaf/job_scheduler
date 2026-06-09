@@ -18,6 +18,20 @@ type SocketMessage struct {
 	Payload any         `json:"data"`
 }
 
+func BroadcastSocketMessage(conns []*websocket.Conn, msg *SocketMessage) []string {
+	var errorMessages []string
+	for _, conn := range conns {
+		err := conn.WriteJSON(msg)
+		if err != nil {
+			errorMessages = append(errorMessages, err.Error())
+		}
+	}
+	if len(errorMessages) == 0 {
+		return nil
+	}
+	return errorMessages
+}
+
 func SendSocketMessage(conn *websocket.Conn, msg *SocketMessage) error {
 	err := conn.WriteJSON(msg)
 	return err
