@@ -9,8 +9,9 @@ import (
 )
 
 type Config struct {
-	App AppConfig
-	DB  DBConfig
+	App    AppConfig
+	DB     DBConfig
+	Socket SocketConfig
 }
 
 var config Config

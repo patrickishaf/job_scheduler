@@ -16,4 +16,5 @@ func InitRouter(httpHandler *httpHandler, socketHandler *socketHandler) *APIRout
 
 func (this *APIRouter) ConfigureRoutes(routerGroup *gin.RouterGroup) {
 	routerGroup.GET("/", this.httpHandler.GetInfo)
+	routerGroup.GET("/jobs/listen", this.socketHandler.handleConnection)
 }

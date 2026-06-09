@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/patrickishaf/job_scheduler/config"
 )
@@ -20,6 +21,7 @@ func CreateAppServer(cfg *config.AppConfig) *AppServer {
 }
 
 func (srv *AppServer) ConfigureRoutes(router *APIRouter) {
+	srv.handler.Use(cors.Default())
 	apiGroup := srv.handler.Group("/api")
 	router.ConfigureRoutes(apiGroup)
 }
