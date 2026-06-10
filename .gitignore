@@ -47,6 +47,5 @@ bin/*
 !bin/main
 .vscode/
 .metadata/
-cmd/
 
 tmp/
