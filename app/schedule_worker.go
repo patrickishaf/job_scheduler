@@ -25,7 +25,7 @@ func CreateScheduledWorker(cfg *config.AppConfig, srv *service, logger *slog.Log
 
 func (this *ScheduleWorker) processJob() {
 	/**
-	 * An interval job is a job whose value of interval_minutes is not null
+	 * An interval job is a job whose value of interval is not null
 		* Get the next interval job with status == pending and retry_count < cfg.MaxJobRetryCount and scheduled_time <= time.Now
 		* update the job status to processing
 		* update attempt_count to +1

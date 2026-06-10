@@ -16,6 +16,12 @@ func (this *SocketConnectionStore) Add(conn *websocket.Conn) {
 	this.store[conn] = true
 }
 
+func (this *SocketConnectionStore) BroadcastMessage(msg *SocketMessage) {
+	for c := range this.store {
+		SendSocketMessage(c, msg)
+	}
+}
+
 func (this *SocketConnectionStore) Clear() {
 	for c := range this.store {
 		delete(this.store, c)

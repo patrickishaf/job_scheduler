@@ -15,6 +15,7 @@ func InitRouter(httpHandler *httpHandler, socketHandler *socketHandler) *APIRout
 }
 
 func (this *APIRouter) ConfigureRoutes(routerGroup *gin.RouterGroup) {
-	routerGroup.GET("/", this.httpHandler.GetInfo)
+	routerGroup.GET("/jobs", this.httpHandler.GetJobs)
+	routerGroup.POST("/jobs", this.httpHandler.CreateJob)
 	routerGroup.GET("/jobs/listen", this.socketHandler.handleConnection)
 }

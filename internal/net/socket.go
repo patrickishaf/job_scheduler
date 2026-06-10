@@ -7,10 +7,11 @@ import (
 type SocketEvent string
 
 const (
-	SOCKET_EVENT_ACK        SocketEvent = "ack"
-	SOCKET_EVENT_CONNECT    SocketEvent = "connect"
-	SOCKET_EVENT_DISCONNECT SocketEvent = "disconnect"
-	SOCKET_EVENT_ERROR      SocketEvent = "error"
+	SOCKET_EVENT_ACK         SocketEvent = "ack"
+	SOCKET_EVENT_CONNECT     SocketEvent = "connect"
+	SOCKET_EVENT_DISCONNECT  SocketEvent = "disconnect"
+	SOCKET_EVENT_ERROR       SocketEvent = "error"
+	SOCKET_EVENT_JOB_CREATED SocketEvent = "job_created"
 )
 
 type SocketMessage struct {
