@@ -11,6 +11,7 @@ import (
 type Config struct {
 	App    AppConfig
 	DB     DBConfig
+	Redis  RedisConfig
 	Socket SocketConfig
 }
 

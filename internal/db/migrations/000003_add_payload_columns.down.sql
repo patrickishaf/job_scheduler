@@ -1,0 +1,2 @@
+ALTER TABLE dead_letter_queue DROP COLUMN IF EXISTS payload;
+ALTER TABLE jobs DROP COLUMN IF EXISTS payload;

@@ -37,7 +37,10 @@ func (this *socketHandler) handleConnection(c *gin.Context) {
 	conn, err := this.wsUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		c.IndentedJSON(http.StatusNotAcceptable, "failed to connect to websocket")
+		return
 	}
+
+	this.srv.StoreSocketConn(conn)
 
 	for {
 		_, msgBytes, err := conn.ReadMessage()

@@ -1,0 +1,3 @@
+ALTER TABLE jobs ADD COLUMN payload JSONB NOT NULL DEFAULT '{}';
+
+ALTER TABLE dead_letter_queue ADD COLUMN payload JSONB NOT NULL DEFAULT '{}';
