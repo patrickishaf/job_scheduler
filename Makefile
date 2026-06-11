@@ -1,7 +1,13 @@
-.PHONY: run build build-macos build-linux demo migrate migrate-down migrate-force migrate-reset
+.PHONY: run run-web build build-macos build-linux demo migrate migrate-down migrate-force migrate-reset
 
 run:
 	go run cmd/server/main.go
+
+run-server:
+	go run cmd/server/main.go
+
+run-web:
+	npm --prefix ./web run dev
 
 build:
 	go build -o ./bin/app cmd/server/main.go

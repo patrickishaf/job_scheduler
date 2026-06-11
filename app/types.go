@@ -18,7 +18,7 @@ const (
 	PROCESSING_STATUS_PROCESSING ProcessingStatus = "processing"
 )
 
-type CreateJobDTO struct {
+type createJobDTO struct {
 	Type          JobType        `form:"type" json:"type" binding:"required"`
 	Priority      int            `form:"priority" json:"priority" binding:"required,min=1,max=3"`
 	Payload       map[string]any `form:"payload" json:"payload" binding:"required"`
@@ -26,12 +26,16 @@ type CreateJobDTO struct {
 	Interval      *int           `form:"interval_seconds" json:"interval_seconds" binding:"omitempty"`
 }
 
-type GetJobsDTO struct {
-	Search string           `json:"search" binding:"omitempty"`
-	Status ProcessingStatus `json:"status" binding:"omitempty"`
+type getJobsDTO struct {
+	Search string           `form:"search" binding:"omitempty"`
+	Status ProcessingStatus `form:"status" binding:"omitempty"`
 }
 
-type Job struct {
+type getSingleJobReqParams struct {
+	JobID string `uri:"id" binding:"required"`
+}
+
+type job struct {
 	ID            uuid.UUID      `json:"id"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
@@ -45,4 +49,14 @@ type Job struct {
 	ScheduledTime time.Time      `json:"scheduled_time"`
 	Status        string         `json:"status"`
 	Type          string         `json:"type"`
+}
+
+type jobsSummaryDTO struct {
+	Queued     int `json:"queued"`
+	Processing int `json:"processing"`
+	Cancelled  int `json:"cancelled"`
+	Completed  int `json:"completed"`
+	Failed     int `json:"failed"`
+	Pending    int `json:"pending"`
+	Scheduled  int `json:"scheduled"`
 }

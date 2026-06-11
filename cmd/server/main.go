@@ -44,9 +44,7 @@ func main() {
 
 	srv := app.CreateAppServer(&cfg.App)
 	srv.ConfigureRoutes(apiRouter)
-	go func() {
-		srv.Run()
-	}()
+	go srv.Run()
 
 	exitChan := make(chan os.Signal, 1)
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)

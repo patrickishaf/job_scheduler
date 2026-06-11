@@ -7,11 +7,16 @@ import (
 type SocketEvent string
 
 const (
-	SOCKET_EVENT_ACK         SocketEvent = "ack"
-	SOCKET_EVENT_CONNECT     SocketEvent = "connect"
-	SOCKET_EVENT_DISCONNECT  SocketEvent = "disconnect"
-	SOCKET_EVENT_ERROR       SocketEvent = "error"
-	SOCKET_EVENT_JOB_CREATED SocketEvent = "job_created"
+	SOCKET_EVENT_ACK           SocketEvent = "ack"
+	SOCKET_EVENT_CONNECT       SocketEvent = "connect"
+	SOCKET_EVENT_DISCONNECT    SocketEvent = "disconnect"
+	SOCKET_EVENT_ERROR         SocketEvent = "error"
+	SOCKET_EVENT_JOB_CREATED   SocketEvent = "job_created"
+	SOCKET_EVENT_JOB_QUEUED    SocketEvent = "job_queued"
+	SOCKET_EVENT_JOB_RUNNING   SocketEvent = "job_running"
+	SOCKET_EVENT_JOB_COMPLETED SocketEvent = "job_completed"
+	SOCKET_EVENT_JOB_FAILED    SocketEvent = "job_failed"
+	SOCKET_EVENT_JOB_SCHEDULED SocketEvent = "job_scheduled"
 )
 
 type SocketMessage struct {

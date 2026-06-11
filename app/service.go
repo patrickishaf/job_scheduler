@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/patrickishaf/job_scheduler/internal/common"
 	"github.com/patrickishaf/job_scheduler/internal/db/model"
 	"github.com/patrickishaf/job_scheduler/internal/db/repository"
 	"github.com/patrickishaf/job_scheduler/internal/infra"
@@ -17,7 +19,7 @@ type service struct {
 	dlqRepo         *repository.DLQRepository
 	jobRepo         *repository.JobRepository
 	logger          *slog.Logger
-	socketConnStore net.SocketConnectionStore
+	socketConnStore *net.SocketConnectionStore
 }
 
 func CreateService(
@@ -27,17 +29,16 @@ func CreateService(
 	socketConnStore *net.SocketConnectionStore,
 	logger *slog.Logger,
 ) *service {
-	l := logger.With("service", "service", "caller", "service")
 	return &service{
 		cache:           cache,
 		dlqRepo:         dlqRepo,
 		jobRepo:         jobRepo,
-		logger:          l,
-		socketConnStore: *socketConnStore,
+		logger:          logger,
+		socketConnStore: socketConnStore,
 	}
 }
 
-func (this *service) convertJobToModel(job *Job) *model.Job {
+func (this *service) convertJobToModel(job *job) *model.Job {
 	return &model.Job{
 		ID:            job.ID,
 		CreatedAt:     job.CreatedAt,
@@ -55,8 +56,8 @@ func (this *service) convertJobToModel(job *Job) *model.Job {
 	}
 }
 
-func (this *service) convertModelToJob(j *model.Job) *Job {
-	job := Job{
+func (this *service) convertModelToJob(j *model.Job) *job {
+	job := job{
 		ID:            j.ID,
 		CreatedAt:     j.CreatedAt,
 		UpdatedAt:     j.UpdatedAt,
@@ -76,7 +77,7 @@ func (this *service) convertModelToJob(j *model.Job) *Job {
 	return &job
 }
 
-func (this *service) CreateJob(ctx context.Context, dto CreateJobDTO) (int, *Job, error) {
+func (this *service) CreateJob(ctx context.Context, dto createJobDTO) (int, *job, error) {
 	jobData := &model.Job{
 		Payload:       dto.Payload,
 		Priority:      dto.Priority,
@@ -99,13 +100,13 @@ func (this *service) CreateJob(ctx context.Context, dto CreateJobDTO) (int, *Job
 	return 201, job, nil
 }
 
-func (this *service) GetAllJobs(ctx context.Context, dto GetJobsDTO) (int, []Job, error) {
+func (this *service) GetJobs(ctx context.Context, dto getJobsDTO) (int, []job, error) {
 	jobModels, err := this.jobRepo.GetAllJobs(ctx)
 	if err != nil {
-		this.logger.Error("failed to get all jobs", "err", err.Error(), "caller", "service.CreateJob")
+		this.logger.Error("failed to get all jobs", "err", err.Error(), "caller", "service.GetJobs")
 		return 500, nil, err
 	}
-	var jobs []Job
+	jobs := make([]job, 0)
 	for _, j := range jobModels {
 		job := this.convertModelToJob(&j)
 		jobs = append(jobs, *job)
@@ -113,13 +114,65 @@ func (this *service) GetAllJobs(ctx context.Context, dto GetJobsDTO) (int, []Job
 	return 200, jobs, nil
 }
 
-func (this *service) GetDeadLetterQueueJobs() {}
+func (this *service) GetDeadLetterQueueJobs(ctx context.Context) (int, []job, error) {
+	logger := this.logger.With("caller", "service.GetDeadLetterQueueJobs", "request_id", ctx.Value(common.CTX_KEY_REQUEST_ID))
 
-func (this *service) GetJobsSummary() {}
+	jobModels, err := this.dlqRepo.FindAll(ctx)
+	if err != nil {
+		logger.Error("failed to get all dead letter queue jobs", "err", err.Error())
+		return 500, nil, err
+	}
+	if len(jobModels) == 0 {
+		return 200, make([]job, 0), nil
+	}
+	jobs := make([]job, 0)
+	for _, j := range jobModels {
+		job := this.convertModelToJob(&j)
+		jobs = append(jobs, *job)
+	}
+	return 200, jobs, nil
+}
 
-func (this *service) GetSingleJob(jobID uuid.UUID) {}
+func (this *service) GetJobsSummary(ctx context.Context) (int, *jobsSummaryDTO, error) {
+	logger := this.logger.With("caller", "service.GetJobs", "request_id", ctx.Value(common.CTX_KEY_REQUEST_ID))
 
-func (this *service) RequeueJob(jobID uuid.UUID) {
+	var summary jobsSummaryDTO
+	jobCounts, err := this.jobRepo.CountJobsByStatus(ctx)
+	if err != nil {
+		logger.Error("failed to GetJobs", "err", err.Error())
+		return 500, nil, err
+	}
+	for _, v := range jobCounts {
+		if v.Status == string(PROCESSING_STATUS_CANCELLED) {
+			summary.Cancelled = v.Count
+		} else if v.Status == string(PROCESSING_STATUS_COMPLETED) {
+			summary.Completed = v.Count
+		} else if v.Status == string(PROCESSING_STATUS_FAILED) {
+			summary.Failed = v.Count
+		} else if v.Status == string(PROCESSING_STATUS_PENDING) {
+			summary.Pending = v.Count
+		} else if v.Status == string(PROCESSING_STATUS_PROCESSING) {
+			summary.Processing = v.Count
+		}
+	}
+	// TODO: Fetch queued job count but checking the size of the queue
+	return 200, &summary, nil
+}
+
+func (this *service) GetSingleJob(ctx context.Context, jobID uuid.UUID) (int, *job, error) {
+	logger := this.logger.With("caller", "service.GetSingleJob", "request_id", ctx.Value(common.CTX_KEY_REQUEST_ID))
+
+	jobFromDB, err := this.jobRepo.GetJobByID(ctx, jobID)
+	if err != nil {
+		logger.Error("failed to get single job", "err", err.Error())
+		return 500, nil, err
+	}
+
+	job := this.convertModelToJob(jobFromDB)
+	return 500, job, nil
+}
+
+func (this *service) RequeueJob(ctx context.Context, jobID uuid.UUID) (int, any, error) {
 	/**
 	 * steps
 		* ensure the job exists in the dead letter queue
@@ -127,6 +180,7 @@ func (this *service) RequeueJob(jobID uuid.UUID) {
 		* delete the job from the dead letter queue
 		* return a response
 	*/
+	return 500, nil, fmt.Errorf(common.ErrMethodNotImplemented)
 }
 
 func (this *service) StoreSocketConn(conn *websocket.Conn) {
