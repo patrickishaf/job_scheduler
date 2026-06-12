@@ -2,8 +2,6 @@ package app
 
 import (
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type JobType string
@@ -16,6 +14,7 @@ const (
 	PROCESSING_STATUS_FAILED     ProcessingStatus = "failed"
 	PROCESSING_STATUS_PENDING    ProcessingStatus = "pending"
 	PROCESSING_STATUS_PROCESSING ProcessingStatus = "processing"
+	PROCESSING_STATUS_QUEUED     ProcessingStatus = "queued"
 )
 
 type createJobDTO struct {
@@ -35,22 +34,6 @@ type getSingleJobReqParams struct {
 	JobID string `uri:"id" binding:"required"`
 }
 
-type job struct {
-	ID            uuid.UUID      `json:"id"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     time.Time      `json:"updated_at"`
-	AttemptCount  int32          `json:"-"`
-	Error         *string        `json:"error"`
-	Interval      *int           `json:"interval"`
-	LastAttemptAt *time.Time     `json:"last_attempt_at"`
-	Payload       map[string]any `json:"payload"`
-	Priority      int            `json:"priority"`
-	RetryCount    int            `json:"retry_count"`
-	ScheduledTime time.Time      `json:"scheduled_time"`
-	Status        string         `json:"status"`
-	Type          string         `json:"type"`
-}
-
 type jobsSummaryDTO struct {
 	Queued     int `json:"queued"`
 	Processing int `json:"processing"`
@@ -59,4 +42,9 @@ type jobsSummaryDTO struct {
 	Failed     int `json:"failed"`
 	Pending    int `json:"pending"`
 	Scheduled  int `json:"scheduled"`
+}
+
+type priorityQueueEntry struct {
+	index int
+	job   *Job
 }

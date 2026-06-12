@@ -5,4 +5,5 @@ type AppConfig struct {
 	MaxDLQSize         int `envconfig:"MAX_DLQ_SIZE" default:"10"`
 	MaxJobAttemptCount int `envconfig:"MAX_JOB_ATTEMPT_COUNT" default:"4"`
 	MaxJobRetryCount   int `envconfig:"MAX_JOB_RETRY_COUNT" default:"3"`
+	QueueType          int `envconfig:"QUEUE_TYPE" default:"heap"`
 }

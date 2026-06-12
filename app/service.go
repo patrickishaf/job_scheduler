@@ -38,7 +38,7 @@ func CreateService(
 	}
 }
 
-func (this *service) convertJobToModel(job *job) *model.Job {
+func (this *service) convertJobToModel(job *Job) *model.Job {
 	return &model.Job{
 		ID:            job.ID,
 		CreatedAt:     job.CreatedAt,
@@ -56,8 +56,8 @@ func (this *service) convertJobToModel(job *job) *model.Job {
 	}
 }
 
-func (this *service) convertModelToJob(j *model.Job) *job {
-	job := job{
+func (this *service) convertModelToJob(j *model.Job) *Job {
+	job := Job{
 		ID:            j.ID,
 		CreatedAt:     j.CreatedAt,
 		UpdatedAt:     j.UpdatedAt,
@@ -77,7 +77,7 @@ func (this *service) convertModelToJob(j *model.Job) *job {
 	return &job
 }
 
-func (this *service) CreateJob(ctx context.Context, dto createJobDTO) (int, *job, error) {
+func (this *service) CreateJob(ctx context.Context, dto createJobDTO) (int, *Job, error) {
 	jobData := &model.Job{
 		Payload:       dto.Payload,
 		Priority:      dto.Priority,
@@ -100,13 +100,13 @@ func (this *service) CreateJob(ctx context.Context, dto createJobDTO) (int, *job
 	return 201, job, nil
 }
 
-func (this *service) GetJobs(ctx context.Context, dto getJobsDTO) (int, []job, error) {
+func (this *service) GetJobs(ctx context.Context, dto getJobsDTO) (int, []Job, error) {
 	jobModels, err := this.jobRepo.GetAllJobs(ctx)
 	if err != nil {
 		this.logger.Error("failed to get all jobs", "err", err.Error(), "caller", "service.GetJobs")
 		return 500, nil, err
 	}
-	jobs := make([]job, 0)
+	jobs := make([]Job, 0)
 	for _, j := range jobModels {
 		job := this.convertModelToJob(&j)
 		jobs = append(jobs, *job)
@@ -114,7 +114,7 @@ func (this *service) GetJobs(ctx context.Context, dto getJobsDTO) (int, []job, e
 	return 200, jobs, nil
 }
 
-func (this *service) GetDeadLetterQueueJobs(ctx context.Context) (int, []job, error) {
+func (this *service) GetDeadLetterQueueJobs(ctx context.Context) (int, []Job, error) {
 	logger := this.logger.With("caller", "service.GetDeadLetterQueueJobs", "request_id", ctx.Value(common.CTX_KEY_REQUEST_ID))
 
 	jobModels, err := this.dlqRepo.FindAll(ctx)
@@ -123,9 +123,9 @@ func (this *service) GetDeadLetterQueueJobs(ctx context.Context) (int, []job, er
 		return 500, nil, err
 	}
 	if len(jobModels) == 0 {
-		return 200, make([]job, 0), nil
+		return 200, make([]Job, 0), nil
 	}
-	jobs := make([]job, 0)
+	jobs := make([]Job, 0)
 	for _, j := range jobModels {
 		job := this.convertModelToJob(&j)
 		jobs = append(jobs, *job)
@@ -159,7 +159,7 @@ func (this *service) GetJobsSummary(ctx context.Context) (int, *jobsSummaryDTO, 
 	return 200, &summary, nil
 }
 
-func (this *service) GetSingleJob(ctx context.Context, jobID uuid.UUID) (int, *job, error) {
+func (this *service) GetSingleJob(ctx context.Context, jobID uuid.UUID) (int, *Job, error) {
 	logger := this.logger.With("caller", "service.GetSingleJob", "request_id", ctx.Value(common.CTX_KEY_REQUEST_ID))
 
 	jobFromDB, err := this.jobRepo.GetJobByID(ctx, jobID)

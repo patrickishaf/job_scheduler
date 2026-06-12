@@ -33,10 +33,11 @@ func main() {
 
 	service := app.CreateService(redisCache, dlqRepo, jobRepo, socketConnStore, logger)
 
-	intervalWorker := app.CreateIntervalWorker(&cfg.App, service, logger)
-	scheduledWorker := app.CreateScheduledWorker(&cfg.App, service, logger)
-	go intervalWorker.Start()
-	go scheduledWorker.Start()
+	heapScheduler := app.CreateHeapScheduler()
+	ipqScheduler := app.CreateIndexedPQScheduler()
+
+	worker := app.CreateWorker(&cfg.App, service, heapScheduler, ipqScheduler, logger)
+	go worker.Start()
 
 	httpHandler := app.CreateHTTPHandler(service, logger)
 	socketHandler := app.CreateSocketHandler(&cfg.Socket, service, logger)
@@ -51,8 +52,7 @@ func main() {
 
 	sig := <-exitChan
 	logger.Info("signal received. shutting down application", "sig", sig)
-	intervalWorker.Stop()
-	scheduledWorker.Stop()
+	worker.Stop()
 	socketConnStore.Clear()
 	connectionPool.Close()
 }

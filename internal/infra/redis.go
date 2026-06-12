@@ -26,19 +26,23 @@ func InitRedisCache(cfg *config.RedisConfig) *RedisCache {
 	}
 }
 
-func (this *RedisCache) Dequeue(ctx context.Context, key string) (string, error) {
+func (this *RedisCache) Dequeue(ctx context.Context, key string) ([]byte, error) {
 	b, err := this.client.LPop(ctx, key).Bytes()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(b), nil
+	return b, nil
 }
 
 func (this *RedisCache) Get(ctx context.Context, key string) (string, error) {
 	return this.client.Get(ctx, key).Result()
 }
 
-func (this *RedisCache) Queue(ctx context.Context, key string, value any) error {
+func (this *RedisCache) GetClient() *redis.Client {
+	return this.client
+}
+
+func (this *RedisCache) Queue(ctx context.Context, key string, value string) error {
 	return this.client.RPush(ctx, key, value).Err()
 }
 

@@ -7,26 +7,33 @@ import (
 	"github.com/patrickishaf/job_scheduler/config"
 )
 
-type IntervalWorker struct {
-	cfg    *config.AppConfig
-	logger *slog.Logger
-	srv    *service
-	ticker *time.Ticker
+type Worker struct {
+	cfg           *config.AppConfig
+	logger        *slog.Logger
+	srv           *service
+	heapScheduler *HeapScheduler
+	ipqScheduler  *IndexedPQScheduler
+	ticker        *time.Ticker
 }
 
-func CreateIntervalWorker(cfg *config.AppConfig, srv *service, logger *slog.Logger) *IntervalWorker {
-	return &IntervalWorker{
-		cfg:    cfg,
-		logger: logger,
-		srv:    srv,
-		ticker: nil,
+func CreateWorker(
+	cfg *config.AppConfig,
+	srv *service,
+	heapScheduler *HeapScheduler,
+	ipqScheduler *IndexedPQScheduler,
+	logger *slog.Logger,
+) *Worker {
+	return &Worker{
+		cfg:           cfg,
+		logger:        logger,
+		srv:           srv,
+		heapScheduler: heapScheduler,
+		ipqScheduler:  ipqScheduler,
+		ticker:        nil,
 	}
 }
 
-/**
- * This worker picks only one job at a time to prevent multiple workers from picking the same job
- */
-func (this *IntervalWorker) processJob() {
+func (this *Worker) processJob() {
 	/**
 	 * An interval job is a job whose value of interval is not null
 		* Get the next interval job with status == pending and retry_count < cfg.MaxJobRetryCount and scheduled_time <= time.Now
@@ -40,15 +47,15 @@ func (this *IntervalWorker) processJob() {
 	*/
 }
 
-func (this *IntervalWorker) Start() error {
-	this.ticker = time.NewTicker(time.Second)
+func (this *Worker) Start() error {
+	this.ticker = time.NewTicker(1 * time.Second / 2)
 	for range this.ticker.C {
 		go this.processJob()
 	}
 	return nil
 }
 
-func (this *IntervalWorker) Stop() error {
+func (this *Worker) Stop() error {
 	this.ticker.Stop()
 	return nil
 }
