@@ -10,6 +10,7 @@ const (
 	SOCKET_EVENT_ACK           SocketEvent = "ack"
 	SOCKET_EVENT_CONNECT       SocketEvent = "connect"
 	SOCKET_EVENT_DISCONNECT    SocketEvent = "disconnect"
+	SOCKET_EVENT_DLQ_UPDATED   SocketEvent = "dlq_updated"
 	SOCKET_EVENT_ERROR         SocketEvent = "error"
 	SOCKET_EVENT_JOB_CREATED   SocketEvent = "job_created"
 	SOCKET_EVENT_JOB_QUEUED    SocketEvent = "job_queued"

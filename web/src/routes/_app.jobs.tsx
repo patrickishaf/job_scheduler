@@ -1,8 +1,8 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { StatusBadge } from "@/components/jobs/StatusBadge";
-import type { JobStatus } from "@/lib/jobs.types";
+import type { JobStatus, SocketEvent } from "@/lib/jobs.types";
 import { jobStatuses } from "@/lib/jobs.types";
 import {
   Table,
@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { CreateJobForm } from "@/components/jobs/CreateJobForm";
 import { networkService } from "@/lib/api/network.service";
+import { useWsMessage } from "@/hooks/use-ws-message";
 
 const JOBS_API_URL = "/api/jobs";
 
@@ -67,7 +68,6 @@ function fmt(iso?: string | null) {
 }
 
 function JobsPage() {
-  const router = useRouter();
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["jobs"],
     queryFn: fetchJobs,
@@ -89,6 +89,24 @@ function JobsPage() {
       return true;
     });
   }, [jobs, status, search]);
+
+  useWsMessage(
+    useCallback((event) => {
+      const msg: { event: SocketEvent } = JSON.parse(event.data);
+      switch (msg.event) {
+        case "job_created":
+        case "job_completed":
+        case "job_failed":
+        case "job_queued":
+        case "job_running":
+        case "job_scheduled":
+          refetch();
+          break;
+        default:
+          break;
+      }
+    }, []),
+  );
 
   return (
     <div className="p-8 space-y-6">
@@ -172,7 +190,7 @@ function JobsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {isLoading || isFetching ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
                   Loading jobs…

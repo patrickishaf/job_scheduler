@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+export const socketEvents = [
+  "ack",
+  "connect",
+  "disconnect",
+  "dlq_updated",
+  "error",
+  "job_created",
+  "job_queued",
+  "job_running",
+  "job_completed",
+  "job_failed",
+  "job_scheduled",
+] as const;
+export type SocketEvent = (typeof socketEvents)[number];
+
 export const jobStatuses = [
   "queued",
   "processing",

@@ -119,7 +119,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WsProvider url="http://localhost:8000">
+      <WsProvider url="http://localhost:8000/api/jobs/listen">
         <Outlet />
       </WsProvider>
     </QueryClientProvider>

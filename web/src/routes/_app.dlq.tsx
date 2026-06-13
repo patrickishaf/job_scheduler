@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,8 +20,9 @@ import {
 } from "@/components/ui/dialog";
 import { Eye, RotateCw, AlertOctagon } from "lucide-react";
 import { toast } from "sonner";
-import type { Job } from "@/lib/jobs.types";
+import type { Job, SocketEvent } from "@/lib/jobs.types";
 import { networkService } from "@/lib/api/network.service";
+import { useWsMessage } from "@/hooks/use-ws-message";
 
 const DLQ_API_URL = "/api/dlq";
 
@@ -64,7 +65,13 @@ function fmt(iso?: string) {
 }
 
 function DlqPage() {
-  const { data, isLoading, error, isFetching } = useQuery({
+  const {
+    data,
+    isLoading,
+    error,
+    refetch: refetchDLQ,
+    isFetching,
+  } = useQuery({
     queryKey: ["jobs"],
     queryFn: fetchDLQJobs,
     refetchOnWindowFocus: false,
@@ -84,6 +91,19 @@ function DlqPage() {
     },
     onError: (err: Error) => toast.error("Retry failed", { description: err.message }),
   });
+
+  useWsMessage(
+    useCallback((event) => {
+      const msg: { event: SocketEvent } = JSON.parse(event.data);
+      switch (msg.event) {
+        case "dlq_updated":
+          refetchDLQ();
+          break;
+        default:
+          break;
+      }
+    }, []),
+  );
 
   return (
     <div className="p-8 space-y-6">

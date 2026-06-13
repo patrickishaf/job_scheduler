@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/google/uuid"
 	"github.com/patrickishaf/job_scheduler/app"
 	"github.com/patrickishaf/job_scheduler/config"
 	"github.com/patrickishaf/job_scheduler/internal/common"
@@ -21,8 +19,6 @@ import (
 func main() {
 	cfg := config.LoadConfig()
 	logger := common.InitLogger()
-
-	fmt.Println(uuid.New())
 
 	connectionPool, err := db.CreateConnectionPool(context.Background(), cfg.DB.GetConnectionString())
 	if err != nil {
