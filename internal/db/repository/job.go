@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/patrickishaf/job_scheduler/config"
 	"github.com/patrickishaf/job_scheduler/internal/common"
@@ -67,20 +68,12 @@ func (this *JobRepository) DeleteJob(ctx context.Context, jobID uuid.UUID) error
 	return nil
 }
 
-func (this *JobRepository) FindNextPendingScheduledJob(ctx context.Context, job *model.Job) ([]model.Job, error) {
-	return nil, fmt.Errorf("method not implemented")
-}
-
-func (this *JobRepository) FindNextPendingRecurringJob(ctx context.Context, job *model.Job) ([]model.Job, error) {
-	return nil, fmt.Errorf("method not implemented")
-}
-
 func (this *JobRepository) GetAllJobs(ctx context.Context) ([]model.Job, error) {
 	logger := this.logger.With("caller", "JobRepository.GetAllJobs")
 	query := `SELECT id, created_at, updated_at, attempt_count, error, interval, last_attempt_at, priority, retry_count, scheduled_time, status, type, payload FROM jobs`
 	rows, err := this.connPool.Query(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(common.ErrDBOperationFailed)
 	}
 	defer rows.Close()
 	var jobs []model.Job
@@ -115,7 +108,7 @@ func (this *JobRepository) GetAllJobsByStatus(ctx context.Context, status common
 	query := `SELECT id, created_at, updated_at, attempt_count, error, interval, last_attempt_at, priority, retry_count, scheduled_time, status, type, payload FROM jobs WHERE status = $1`
 	rows, err := this.connPool.Query(ctx, query, status)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(common.ErrDBOperationFailed)
 	}
 	defer rows.Close()
 	var jobs []model.Job
@@ -185,7 +178,7 @@ func (this *JobRepository) GetAllJobsByStatusAndSearch(ctx context.Context, stat
 	query := `SELECT id, created_at, updated_at, attempt_count, error, interval, last_attempt_at, priority, retry_count, scheduled_time, status, type, payload FROM jobs WHERE type LIKE %$1% AND status = $2`
 	rows, err := this.connPool.Query(ctx, query, search)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(common.ErrDBOperationFailed)
 	}
 	defer rows.Close()
 	var jobs []model.Job
@@ -241,6 +234,32 @@ func (this *JobRepository) GetJobByID(ctx context.Context, jobID uuid.UUID) (*mo
 	return &job, nil
 }
 
+func (this *JobRepository) GetJobByIDInTx(ctx context.Context, jobID uuid.UUID, tx *pgx.Tx) (*model.Job, error) {
+	logger := this.logger.With("caller", "DLQRepository.GetJobByIDInTx", "request_id", ctx.Value(common.CTX_KEY_REQUEST_ID))
+	var job model.Job
+	query := `SELECT id, created_at, updated_at, attempt_count, error, interval, last_attempt_at, priority, retry_count, scheduled_time, status, type, payload FROM jobs WHERE id = $1`
+	err := (*tx).QueryRow(ctx, query, jobID).Scan(
+		&job.ID,
+		&job.CreatedAt,
+		&job.UpdatedAt,
+		&job.AttemptCount,
+		&job.Error,
+		&job.Interval,
+		&job.LastAttemptAt,
+		&job.Priority,
+		&job.RetryCount,
+		&job.ScheduledTime,
+		&job.Status,
+		&job.Type,
+		&job.Payload,
+	)
+	if err != nil {
+		logger.Error("failed to find job by id", "err", err.Error(), "job_id", jobID)
+		return nil, errors.New(common.ErrDBResourceNotFound)
+	}
+	return &job, nil
+}
+
 func (this *JobRepository) MarkJobAsProcessing(ctx context.Context, jobID uuid.UUID, status common.ProcessingStatus, attemptCount int) (*model.Job, error) {
 	return nil, fmt.Errorf("method not implemented")
 }
@@ -269,7 +288,7 @@ func (this *JobRepository) SaveDefaultJob(ctx context.Context, job *model.Job) (
 	).Scan(&job.ID, &job.Status)
 	if err != nil {
 		logger.Error("failed to save default job", "err", err.Error())
-		return nil, err
+		return nil, errors.New(common.ErrDBOperationFailed)
 	}
 	return job, nil
 }

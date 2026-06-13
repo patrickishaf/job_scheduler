@@ -1,6 +1,13 @@
 import { z } from "zod";
 
-export const jobStatuses = ["queued", "running", "completed", "failed", "scheduled"] as const;
+export const jobStatuses = [
+  "queued",
+  "processing",
+  "completed",
+  "failed",
+  "cancelled",
+  "pending",
+] as const;
 export type JobStatus = (typeof jobStatuses)[number];
 
 export const jobTypes = [

@@ -12,7 +12,7 @@ export const networkService = {
     return res.data;
   },
 
-  patch: async (url: string, body: object) => {
+  patch: async (url: string, body: object = {}) => {
     const res = await client.patch(url, body);
     return res.data;
   },

@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 
 	"github.com/google/uuid"
@@ -169,18 +169,51 @@ func (this *service) GetSingleJob(ctx context.Context, jobID uuid.UUID) (int, *J
 	}
 
 	job := this.convertModelToJob(jobFromDB)
-	return 500, job, nil
+	return 200, job, nil
 }
 
-func (this *service) RequeueJob(ctx context.Context, jobID uuid.UUID) (int, any, error) {
-	/**
-	 * steps
-		* ensure the job exists in the dead letter queue
-		* add the job to the db for the worker to pick it up
-		* delete the job from the dead letter queue
-		* return a response
-	*/
-	return 500, nil, fmt.Errorf(common.ErrMethodNotImplemented)
+func (this *service) RequeueJob(ctx context.Context, jobID uuid.UUID) (int, *Job, error) {
+	logger := this.logger.With("caller", "service.RequeueJob", "request_id", ctx.Value(common.CTX_KEY_REQUEST_ID))
+
+	txn, err := this.dlqRepo.BeginTransaction(ctx)
+	if err != nil {
+		logger.Error("failed to create db transaction", "err", err.Error())
+		return 200, nil, err
+	}
+	defer txn.Rollback(ctx)
+
+	dlqJob, err := this.dlqRepo.FindByJobID(ctx, jobID, &txn)
+	if err != nil {
+		logger.Error("failed to find job in DLQ by id", "job_id", jobID.String())
+		return 404, nil, err
+	}
+
+	if err = this.dlqRepo.DeleteJob(ctx, jobID, &txn); err != nil {
+		logger.Error("failed to delete job by id", "err", err.Error(), "job_id", jobID.String())
+		return 500, nil, err
+	}
+
+	job, err := this.jobRepo.SaveDefaultJob(ctx, &model.Job{
+		ID:            dlqJob.ID,
+		Payload:       dlqJob.Payload,
+		Priority:      dlqJob.Priority,
+		ScheduledTime: dlqJob.ScheduledTime,
+		Type:          dlqJob.Type,
+		Interval:      dlqJob.Interval,
+	})
+	if err != nil {
+		logger.Error("failed to save job to db", "err", err.Error())
+		return 500, nil, err
+	}
+
+	if err = txn.Commit(ctx); err != nil {
+		logger.Error("failed to commit transaction", "err", err.Error())
+		return 500, nil, errors.New(common.ErrDBOperationFailed)
+	}
+
+	jd := this.convertModelToJob(job)
+
+	return 201, jd, nil
 }
 
 func (this *service) StoreSocketConn(conn *websocket.Conn) {

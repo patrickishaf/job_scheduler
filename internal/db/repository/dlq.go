@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/patrickishaf/job_scheduler/config"
 	"github.com/patrickishaf/job_scheduler/internal/common"
@@ -29,6 +30,18 @@ func CreateDLQRepository(cfg *config.AppConfig, pool *pgxpool.Pool, log *slog.Lo
 		logger:   log,
 		mu:       &mu,
 	}
+}
+
+func (this *DLQRepository) BeginTransaction(ctx context.Context) (pgx.Tx, error) {
+	logger := this.logger.With("caller", "DLQRepository.CreateTx", "request_id", ctx.Value(common.CTX_KEY_REQUEST_ID))
+
+	txn, err := this.connPool.Begin(ctx)
+	if err != nil {
+		logger.Error("failed to begin db transaction", "err", err.Error())
+		return nil, errors.New(common.ErrDBOperationFailed)
+	}
+
+	return txn, err
 }
 
 func (this *DLQRepository) SaveOne(ctx context.Context, job *model.Job) (*model.Job, error) {
@@ -56,11 +69,11 @@ func (this *DLQRepository) SaveOne(ctx context.Context, job *model.Job) (*model.
 	return job, nil
 }
 
-func (this *DLQRepository) FindByJobID(ctx context.Context, jobID uuid.UUID) (*model.Job, error) {
+func (this *DLQRepository) FindByJobID(ctx context.Context, jobID uuid.UUID, tx *pgx.Tx) (*model.Job, error) {
 	logger := this.logger.With("caller", "DLQRepository.FindByJobID")
 	var job model.Job
 	query := `SELECT id, created_at, updated_at, attempt_count, error, interval, last_attempt_at, priority, retry_count, scheduled_time, status, type, payload FROM dead_letter_queue WHERE id = $1`
-	err := this.connPool.QueryRow(ctx, query, jobID).Scan(
+	err := (*tx).QueryRow(ctx, query, jobID).Scan(
 		&job.ID,
 		&job.CreatedAt,
 		&job.UpdatedAt,
@@ -117,12 +130,13 @@ func (this *DLQRepository) FindAll(ctx context.Context) ([]model.Job, error) {
 	return jobs, nil
 }
 
-func (this *DLQRepository) DeleteJob(ctx context.Context, jobID uuid.UUID) error {
+func (this *DLQRepository) DeleteJob(ctx context.Context, jobID uuid.UUID, tx *pgx.Tx) error {
 	logger := this.logger.With("caller", "DLQRepository.DeleteJob")
-	tag, err := this.connPool.Exec(ctx, `DELETE FROM dead_letter_queue WHERE id = $1`, jobID)
+
+	tag, err := (*tx).Exec(ctx, `DELETE FROM dead_letter_queue WHERE id = $1`, jobID)
 	if err != nil {
 		logger.Error("failed to delete dead letter queue entry", "err", err.Error())
-		return err
+		return errors.New(common.ErrDBOperationFailed)
 	}
 	if tag.RowsAffected() == 0 {
 		logger.Error("no job found with id", "job_id", jobID)

@@ -88,6 +88,7 @@ func (this *httpHandler) GetSingleJob(c *gin.Context) {
 		c.IndentedJSON(400, common.ErrorResponse(common.ErrBadRequest))
 		return
 	}
+
 	sc, data, err := this.svc.GetSingleJob(context.WithValue(c.Request.Context(), common.CTX_KEY_REQUEST_ID, requestID), jobID)
 	if err != nil {
 		c.IndentedJSON(sc, common.ErrorResponse(err.Error()))
@@ -97,7 +98,24 @@ func (this *httpHandler) GetSingleJob(c *gin.Context) {
 }
 
 func (this *httpHandler) RequeueJob(c *gin.Context) {
-	sc, data, err := this.svc.GetDeadLetterQueueJobs(context.WithValue(c.Request.Context(), common.CTX_KEY_REQUEST_ID, uuid.NewString()))
+	requestID := uuid.NewString()
+	logger := this.logger.With("caller", "httpHandler.RequeueJob", common.CTX_KEY_REQUEST_ID, requestID)
+
+	var params requeueJobDTO
+	if err := c.ShouldBindUri(&params); err != nil {
+		logger.Error("failed to get single job", "err", err.Error())
+		c.IndentedJSON(400, common.ErrorResponse(common.ErrBadRequest))
+		return
+	}
+
+	jobID, err := uuid.Parse(params.JobID)
+	if err != nil {
+		logger.Error("invalid job id. not a UUID", "job_id", params.JobID)
+		c.IndentedJSON(400, common.ErrorResponse(common.ErrBadRequest))
+		return
+	}
+
+	sc, data, err := this.svc.RequeueJob(context.WithValue(c.Request.Context(), common.CTX_KEY_REQUEST_ID, uuid.NewString()), jobID)
 	if err != nil {
 		c.IndentedJSON(sc, common.ErrorResponse(err.Error()))
 		return

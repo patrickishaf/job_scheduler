@@ -48,3 +48,7 @@ type priorityQueueEntry struct {
 	index int
 	job   *Job
 }
+
+type requeueJobDTO struct {
+	JobID string `uri:"id" binding:"required"`
+}

@@ -1,8 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { retryJob } from "@/lib/jobs.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +47,13 @@ async function fetchDLQJobs(): Promise<ApiJob[]> {
   return data ?? [];
 }
 
+async function requeueDLQJob(jobID: string): Promise<ApiJob> {
+  const res = await networkService.patch(`/api/jobs/${jobID}/requeue`);
+  if (res.status === "error") throw new Error(`Request failed: ${res.message}`);
+  const data = res.data as ApiJob;
+  return data;
+}
+
 export const Route = createFileRoute("/_app/dlq")({
   head: () => ({ meta: [{ title: "Dead Letter Queue · Jobrunner" }] }),
   component: DlqPage,
@@ -65,13 +70,12 @@ function DlqPage() {
     refetchOnWindowFocus: false,
   });
   const qc = useQueryClient();
-  const retryFn = useServerFn(retryJob);
   const [selected, setSelected] = useState<Job | null>(null);
 
   const jobs = data ?? [];
 
   const retryMutation = useMutation({
-    mutationFn: (id: string) => retryFn({ data: { id } }),
+    mutationFn: (id: string) => requeueDLQJob(id),
     onSuccess: (job) => {
       toast.success("Job re-queued", { description: job.id });
       qc.invalidateQueries({ queryKey: ["dlq"] });
@@ -137,7 +141,7 @@ function DlqPage() {
                   <TableCell className="font-mono text-xs">{j.id}</TableCell>
                   <TableCell>{j.type}</TableCell>
                   <TableCell className="max-w-[28rem] truncate text-red-300">{j.error}</TableCell>
-                  <TableCell className="tabular-nums">`${j.retry_count}/0`</TableCell>
+                  <TableCell className="tabular-nums">{j.retry_count}/3</TableCell>
                   <TableCell className="text-muted-foreground">
                     {fmt(j.last_attempt_at ?? undefined)}
                   </TableCell>
@@ -167,7 +171,7 @@ function DlqPage() {
           <DialogHeader>
             <DialogTitle className="font-mono text-sm">{selected?.id}</DialogTitle>
             <DialogDescription>
-              {selected?.type} · last attempt {fmt(selected?.last_attempt_at)}
+              {selected?.type} · last attempt {fmt(selected?.last_attempt_at ?? undefined)}
             </DialogDescription>
           </DialogHeader>
           {selected && (
@@ -179,7 +183,7 @@ function DlqPage() {
               <div>
                 <div className="text-xs uppercase text-muted-foreground mb-1">Stack trace</div>
                 <pre className="rounded-md bg-muted/40 border border-border/60 p-3 text-xs overflow-auto max-h-64 whitespace-pre">
-                  {selected.stackTrace}
+                  stacktrace not available
                 </pre>
               </div>
               <div>
