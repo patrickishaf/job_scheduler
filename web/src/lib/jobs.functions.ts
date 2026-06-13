@@ -61,22 +61,6 @@ export const getJobCounts = createServerFn({ method: "GET" }).handler(async () =
   return { counts, total: jobs.length };
 });
 
-export const listJobs = createServerFn({ method: "GET" }).handler(async () => {
-  return [...store()].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  );
-});
-
-export const listDlq = createServerFn({ method: "GET" }).handler(async () => {
-  return store()
-    .filter((j) => j.status === "failed")
-    .sort(
-      (a, b) =>
-        new Date(b.last_attempt_at ?? b.created_at).getTime() -
-        new Date(a.last_attempt_at ?? a.created_at).getTime(),
-    );
-});
-
 export const createJob = createServerFn({ method: "POST" })
   .validator(createJobSchema)
   .handler(async ({ data }) => {

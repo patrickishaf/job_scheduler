@@ -33,7 +33,7 @@ import {
 import { CreateJobForm } from "@/components/jobs/CreateJobForm";
 import { networkService } from "@/lib/api/network.service";
 
-const JOBS_API_URL = "http://localhost:8000/api/jobs";
+const JOBS_API_URL = "/api/jobs";
 
 type ApiJob = {
   id: string;
@@ -51,7 +51,7 @@ type ApiJob = {
 };
 
 async function fetchJobs(): Promise<ApiJob[]> {
-  const res = await networkService.get("/api/jobs");
+  const res = await networkService.get(JOBS_API_URL);
   if (res.status === "error") throw new Error(`Request failed: ${res.message}`);
   const data = res.data as ApiJob[] | null;
   return data ?? [];
@@ -100,17 +100,6 @@ function JobsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              refetch();
-              router.invalidate();
-            }}
-            disabled={isFetching}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} /> Refresh
-          </Button>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> New job
           </Button>

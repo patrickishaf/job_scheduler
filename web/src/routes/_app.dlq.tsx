@@ -1,8 +1,8 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useSuspenseQuery, useMutation, useQueryClient, queryOptions } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { listDlq, retryJob } from "@/lib/jobs.functions";
+import { retryJob } from "@/lib/jobs.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,18 +20,37 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Eye, RotateCw, RefreshCw, AlertOctagon } from "lucide-react";
+import { Eye, RotateCw, AlertOctagon } from "lucide-react";
 import { toast } from "sonner";
 import type { Job } from "@/lib/jobs.types";
+import { networkService } from "@/lib/api/network.service";
 
-const dlqQueryOptions = queryOptions({
-  queryKey: ["dlq"],
-  queryFn: () => listDlq(),
-});
+const DLQ_API_URL = "/api/dlq";
+
+type ApiJob = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  error: string | null;
+  interval: number | null;
+  last_attempt_at: string | null;
+  payload: Record<string, unknown>;
+  priority: number;
+  retry_count: number;
+  scheduled_time: string;
+  status: string;
+  type: string;
+};
+
+async function fetchDLQJobs(): Promise<ApiJob[]> {
+  const res = await networkService.get(DLQ_API_URL);
+  if (res.status === "error") throw new Error(`Request failed: ${res.message}`);
+  const data = res.data as ApiJob[] | null;
+  return data ?? [];
+}
 
 export const Route = createFileRoute("/_app/dlq")({
   head: () => ({ meta: [{ title: "Dead Letter Queue · Jobrunner" }] }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(dlqQueryOptions),
   component: DlqPage,
 });
 
@@ -40,11 +59,16 @@ function fmt(iso?: string) {
 }
 
 function DlqPage() {
-  const { data } = useSuspenseQuery(dlqQueryOptions);
-  const router = useRouter();
+  const { data, isLoading, error, isFetching } = useQuery({
+    queryKey: ["jobs"],
+    queryFn: fetchDLQJobs,
+    refetchOnWindowFocus: false,
+  });
   const qc = useQueryClient();
   const retryFn = useServerFn(retryJob);
   const [selected, setSelected] = useState<Job | null>(null);
+
+  const jobs = data ?? [];
 
   const retryMutation = useMutation({
     mutationFn: (id: string) => retryFn({ data: { id } }),
@@ -67,13 +91,10 @@ function DlqPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Dead Letter Queue</h1>
             <p className="text-sm text-muted-foreground">
-              {data.length} jobs exhausted their retries
+              {jobs.length} jobs exhausted their retries
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => router.invalidate()}>
-          <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-        </Button>
       </div>
 
       <Card className="border-border/60 overflow-hidden">
@@ -89,22 +110,37 @@ function DlqPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.length === 0 ? (
+            {isLoading || isFetching ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                  Loading jobs…
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                  <div className="text-muted-foreground">
+                    {(error as Error).message}. Make sure the API server is running at{" "}
+                    <code className="font-mono">{DLQ_API_URL}</code>.
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : jobs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
                   No failed jobs. 🎉
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((j) => (
+              jobs.map((j) => (
                 <TableRow key={j.id}>
                   <TableCell className="font-mono text-xs">{j.id}</TableCell>
                   <TableCell>{j.type}</TableCell>
                   <TableCell className="max-w-[28rem] truncate text-red-300">{j.error}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {j.retry_count}/{j.maxRetries}
+                  <TableCell className="tabular-nums">`${j.retry_count}/0`</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {fmt(j.last_attempt_at ?? undefined)}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{fmt(j.last_attempt_at)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => setSelected(j)}>

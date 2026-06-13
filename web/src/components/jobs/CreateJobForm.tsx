@@ -1,9 +1,7 @@
-import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createJob } from "@/lib/jobs.functions";
-import { createJobSchema, jobTypes, type CreateJobInput, type Job } from "@/lib/jobs.types";
+import { createJobSchema, jobTypes, type CreateJobInput } from "@/lib/jobs.types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +14,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { networkService } from "@/lib/api/network.service";
+
+const CREATE_JOB_API_URL = "/api/jobs";
+
+type ApiJob = {
+  id: string;
+  type: string;
+  status: string;
+  priority: number;
+  retry_count: number;
+  scheduled_time: string;
+  interval: number | null;
+  created_at: string;
+  payload: Record<string, unknown>;
+};
 
 function defaultScheduledAt() {
   const d = new Date();
@@ -24,19 +37,18 @@ function defaultScheduledAt() {
 }
 
 export interface CreateJobFormProps {
-  onCreated?: (job: Job) => void;
+  onCreated?: (job: ApiJob) => void;
   onCancel?: () => void;
 }
 
 export function CreateJobForm({ onCreated, onCancel }: CreateJobFormProps) {
   const qc = useQueryClient();
-  const createFn = useServerFn(createJob);
 
   const form = useForm<CreateJobInput>({
     resolver: zodResolver(createJobSchema),
     defaultValues: {
       type: jobTypes[0],
-      priority: 5,
+      priority: 2,
       scheduled_time: defaultScheduledAt(),
       interval: null,
       maxRetries: 3,
@@ -45,17 +57,37 @@ export function CreateJobForm({ onCreated, onCancel }: CreateJobFormProps) {
   });
 
   const mutation = useMutation({
-    mutationFn: (data: CreateJobInput) =>
-      createFn({
-        data: {
-          ...data,
-          scheduled_time: new Date(data.scheduled_time).toISOString(),
-        },
-      }),
+    mutationFn: async (data: CreateJobInput): Promise<ApiJob> => {
+      let parsedPayload: unknown;
+      try {
+        parsedPayload = JSON.parse(data.payload);
+      } catch {
+        throw new Error("Payload is not valid JSON");
+      }
+      if (!parsedPayload || typeof parsedPayload !== "object" || Array.isArray(parsedPayload)) {
+        throw new Error("Payload must be a JSON object");
+      }
+
+      const body: Record<string, unknown> = {
+        type: data.type,
+        priority: data.priority,
+        payload: parsedPayload,
+        scheduled_time: new Date(data.scheduled_time).toISOString(),
+      };
+      if (data.interval && data.interval > 0) {
+        body.interval_seconds = data.interval;
+      }
+
+      const res = await networkService.post(CREATE_JOB_API_URL, body);
+      if (res.status === "error") {
+        throw new Error(res.message);
+      }
+      return res.data as ApiJob;
+    },
     onSuccess: (job) => {
       toast.success("Job created", { description: job.id });
       qc.invalidateQueries({ queryKey: ["jobs"] });
-      qc.invalidateQueries({ queryKey: ["job-counts"] });
+      qc.invalidateQueries({ queryKey: ["job-summary"] });
       form.reset();
       onCreated?.(job);
     },
@@ -85,15 +117,15 @@ export function CreateJobForm({ onCreated, onCancel }: CreateJobFormProps) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="priority">Priority (1–10)</Label>
+          <Label htmlFor="priority">Priority (1–3)</Label>
           <Input
             id="priority"
             type="number"
             min={1}
-            max={10}
+            max={3}
             {...form.register("priority", { valueAsNumber: true })}
           />
-          <p className="text-xs text-muted-foreground">Higher runs first.</p>
+          <p className="text-xs text-muted-foreground">1 = lowest, 3 = highest.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="maxRetries">Max retries</Label>
@@ -110,19 +142,19 @@ export function CreateJobForm({ onCreated, onCancel }: CreateJobFormProps) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="scheduledAt">Scheduled at</Label>
-          <Input id="scheduledAt" type="datetime-local" {...form.register("scheduledAt")} />
+          <Input id="scheduledAt" type="datetime-local" {...form.register("scheduled_time")} />
           <p className="text-xs text-muted-foreground">Future = scheduled, now/past = queued.</p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="intervalSeconds">Interval (seconds)</Label>
+          <Label htmlFor="interval">Interval (seconds)</Label>
           <Input
-            id="intervalSeconds"
+            id="interval"
             type="number"
             min={0}
             placeholder="0 = one-off"
             onChange={(e) => {
               const n = e.target.valueAsNumber;
-              form.setValue("intervalSeconds", Number.isFinite(n) && n > 0 ? n : null);
+              form.setValue("interval", Number.isFinite(n) && n > 0 ? n : null);
             }}
           />
           <p className="text-xs text-muted-foreground">Re-run every N seconds.</p>
