@@ -57,6 +57,7 @@ func main() {
 	sig := <-exitChan
 	logger.Info(common.SHUTTING_DOWN_SERVER, "signal", sig)
 	worker.Stop()
+	queueWorker.Stop()
 	socketConnStore.Clear()
 	connectionPool.Close()
 }
