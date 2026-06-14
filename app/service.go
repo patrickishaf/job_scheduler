@@ -38,24 +38,6 @@ func CreateService(
 	}
 }
 
-func (this *service) convertJobToModel(job *Job) *model.Job {
-	return &model.Job{
-		ID:            job.ID,
-		CreatedAt:     job.CreatedAt,
-		UpdatedAt:     job.UpdatedAt,
-		AttemptCount:  job.AttemptCount,
-		Error:         job.Error,
-		Interval:      job.Interval,
-		LastAttemptAt: job.LastAttemptAt,
-		Payload:       job.Payload,
-		Priority:      job.Priority,
-		RetryCount:    job.RetryCount,
-		ScheduledTime: job.ScheduledTime,
-		Status:        job.Status,
-		Type:          job.Type,
-	}
-}
-
 func (this *service) convertModelToJob(j *model.Job) *Job {
 	job := Job{
 		ID:            j.ID,

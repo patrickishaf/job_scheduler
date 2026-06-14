@@ -173,7 +173,7 @@ func (this *JobRepository) GetAllJobsLikeSearch(ctx context.Context, search stri
 	return jobs, nil
 }
 
-func (this *JobRepository) GetAllJobsByStatusAndSearch(ctx context.Context, statu string, search string) ([]model.Job, error) {
+func (this *JobRepository) GetAllJobsByStatusAndSearch(ctx context.Context, status string, search string) ([]model.Job, error) {
 	logger := this.logger.With("caller", "JobRepository.GetAllJobs")
 	query := `SELECT id, created_at, updated_at, attempt_count, error, interval, last_attempt_at, priority, retry_count, scheduled_time, status, type, payload FROM jobs WHERE type LIKE %$1% AND status = $2`
 	rows, err := this.connPool.Query(ctx, query, search)

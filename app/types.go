@@ -52,3 +52,12 @@ type priorityQueueEntry struct {
 type requeueJobDTO struct {
 	JobID string `uri:"id" binding:"required"`
 }
+
+type scheduler interface {
+	Cancel(jobID string) error
+	Dequeue()
+	EnqueueDueJobs(jobs []*Job)
+	Len() int
+	RequeueRecurring(job *Job)
+	UpdatePriority(jobID string, newPriority int) error
+}

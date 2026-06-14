@@ -22,16 +22,20 @@ type Job struct {
 	Type          string         `json:"type"`
 }
 
-func (j *Job) IsRecurring() bool {
-	return *j.Interval > 0
+func (j *Job) ExhaustedRetries() bool {
+	return int(j.AttemptCount) >= j.RetryCount
 }
 
 func (j *Job) IsDue() bool {
 	return !time.Now().Before(j.ScheduledTime)
 }
 
-func (j *Job) NextRun() time.Time {
-	return time.Now().Add(time.Duration(*j.Interval))
+func (j *Job) IsRecurring() bool {
+	return j.Interval != nil && *j.Interval > 0
+}
+
+func (j *Job) NextScheduledTime() time.Time {
+	return time.Now().Add(time.Duration(*j.Interval) * time.Second)
 }
 
 func (j *Job) HasLessPriorityThan(b *Job) bool {

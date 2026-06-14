@@ -94,7 +94,7 @@ func (s *IndexedPQScheduler) RequeueRecurring(job *Job) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	job.ScheduledTime = job.NextRun()
+	job.ScheduledTime = job.NextScheduledTime()
 	job.AttemptCount = 0
 	job.Status = string(PROCESSING_STATUS_QUEUED)
 

@@ -51,7 +51,7 @@ func main() {
 	signal.Notify(exitChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	sig := <-exitChan
-	logger.Info("signal received. shutting down application", "sig", sig)
+	logger.Info(common.SHUTTING_DOWN_SERVER, "signal", sig)
 	worker.Stop()
 	socketConnStore.Clear()
 	connectionPool.Close()
