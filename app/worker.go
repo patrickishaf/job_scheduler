@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/patrickishaf/job_scheduler/config"
+	"github.com/patrickishaf/job_scheduler/internal/common"
 	"github.com/patrickishaf/job_scheduler/internal/db/repository"
 	"github.com/patrickishaf/job_scheduler/internal/net"
 )
@@ -14,30 +15,33 @@ import (
 type Worker struct {
 	cfg             *config.AppConfig
 	logger          *slog.Logger
-	heapScheduler   *HeapScheduler
-	ipqScheduler    *IndexedPQScheduler
 	jobsRepo        *repository.JobRepository
+	scheduler       Scheduler
 	socketConnStore *net.SocketConnectionStore
 	ticker          *time.Ticker
 }
 
 func CreateWorker(
 	cfg *config.AppConfig,
-	heapScheduler *HeapScheduler,
-	ipqScheduler *IndexedPQScheduler,
+	heapScheduler Scheduler,
+	ipqScheduler Scheduler,
 	jobsRepo *repository.JobRepository,
 	socketStroe *net.SocketConnectionStore,
 	logger *slog.Logger,
 ) *Worker {
-	return &Worker{
+	w := Worker{
 		cfg:             cfg,
 		logger:          logger,
-		heapScheduler:   heapScheduler,
-		ipqScheduler:    ipqScheduler,
 		jobsRepo:        jobsRepo,
 		socketConnStore: socketStroe,
 		ticker:          nil,
 	}
+	if cfg.QueueType == common.QUEUE_TYPE_HEAP {
+		w.scheduler = heapScheduler
+	} else {
+		w.scheduler = ipqScheduler
+	}
+	return &w
 }
 
 func (this *Worker) processJob(ctx context.Context) {
@@ -60,7 +64,7 @@ func (this *Worker) processJob(ctx context.Context) {
 		jobs = append(jobs, job)
 	}
 
-	jobIDMap := this.ipqScheduler.EnqueueDueJobs(jobs)
+	jobIDMap := this.scheduler.EnqueueDueJobs(jobs)
 
 	if len(jobIDMap) == 0 {
 		logger.Error("failed to queue all jobs")

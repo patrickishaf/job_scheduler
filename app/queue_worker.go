@@ -31,6 +31,8 @@ func CreateQueueWorker(cfg *config.AppConfig, heapScheduler *HeapScheduler, ipqS
 func (this *QueueWorker) processJob(_ context.Context) {
 	logger := this.logger.With("caller", "QueueWorker.processJob")
 
+	var job *Job
+
 	job, ok := this.heapScheduler.Dequeue()
 	if !ok {
 		logger.Error("failed to dequeue job")
@@ -41,6 +43,7 @@ func (this *QueueWorker) processJob(_ context.Context) {
 		Event: net.SOCKET_EVENT_JOB_RUNNING,
 	})
 	logger.Info("dequeued job", "job_id", job.ID)
+
 }
 
 func (this *QueueWorker) Start(ctx context.Context) error {

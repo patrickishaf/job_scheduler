@@ -2,6 +2,8 @@ package app
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type JobType string
@@ -53,11 +55,8 @@ type requeueJobDTO struct {
 	JobID string `uri:"id" binding:"required"`
 }
 
-type scheduler interface {
-	Cancel(jobID string) error
-	Dequeue()
-	EnqueueDueJobs(jobs []*Job)
+type Scheduler interface {
+	EnqueueDueJobs(jobs []*Job) map[uuid.UUID]bool
+	Dequeue() (*Job, bool)
 	Len() int
-	RequeueRecurring(job *Job)
-	UpdatePriority(jobID string, newPriority int) error
 }
