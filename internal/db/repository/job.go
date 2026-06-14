@@ -68,6 +68,50 @@ func (this *JobRepository) DeleteJob(ctx context.Context, jobID uuid.UUID) error
 	return nil
 }
 
+func (this *JobRepository) FindAllPendingJobs(ctx context.Context) ([]model.Job, error) {
+	logger := this.logger.With("caller", "JobRepository.FindAllPendingJobs")
+	query := `
+	SELECT id, created_at, updated_at, attempt_count, error, interval, last_attempt_at, priority, retry_count, scheduled_time, status, type, payload
+	FROM jobs
+	WHERE status = $1 AND attempt_count < $2 AND retry_count < $3`
+	rows, err := this.connPool.Query(
+		ctx,
+		query,
+		common.ProcessingStatusPending,
+		this.cfg.MaxJobAttemptCount,
+		this.cfg.MaxJobRetryCount,
+	)
+	if err != nil {
+		return nil, errors.New(common.ErrDBOperationFailed)
+	}
+	defer rows.Close()
+	var jobs []model.Job
+	for rows.Next() {
+		var job model.Job
+		err = rows.Scan(
+			&job.ID,
+			&job.CreatedAt,
+			&job.UpdatedAt,
+			&job.AttemptCount,
+			&job.Error,
+			&job.Interval,
+			&job.LastAttemptAt,
+			&job.Priority,
+			&job.RetryCount,
+			&job.ScheduledTime,
+			&job.Status,
+			&job.Type,
+			&job.Payload,
+		)
+		if err != nil {
+			logger.Error("failed to scan row into job", "err", err.Error())
+			continue
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs, nil
+}
+
 func (this *JobRepository) GetAllJobs(ctx context.Context) ([]model.Job, error) {
 	logger := this.logger.With("caller", "JobRepository.GetAllJobs")
 	query := `SELECT id, created_at, updated_at, attempt_count, error, interval, last_attempt_at, priority, retry_count, scheduled_time, status, type, payload FROM jobs`
@@ -260,8 +304,35 @@ func (this *JobRepository) GetJobByIDInTx(ctx context.Context, jobID uuid.UUID, 
 	return &job, nil
 }
 
-func (this *JobRepository) MarkJobAsProcessing(ctx context.Context, jobID uuid.UUID, status common.ProcessingStatus, attemptCount int) (*model.Job, error) {
-	return nil, fmt.Errorf("method not implemented")
+func (this *JobRepository) MarkJobAsProcessing(ctx context.Context, jobID uuid.UUID, attemptCount, retryCount int) (*model.Job, error) {
+	logger := this.logger.With("caller", "JobRepository.MarkJobAsProcessing")
+	query := `
+	UPDATE jobs
+	SET status = $1, attempt_count = $2, retry_count = $3
+	WHERE id = $4
+	RETURNING id, created_at, updated_at, attempt_count, error, interval, last_attempt_at, priority, retry_count, scheduled_time, status, type, payload
+	`
+	var job model.Job
+	err := this.connPool.QueryRow(ctx, query, common.ProcessingStatusProcessing, attemptCount, retryCount, jobID).Scan(
+		&job.ID,
+		&job.CreatedAt,
+		&job.UpdatedAt,
+		&job.AttemptCount,
+		&job.Error,
+		&job.Interval,
+		&job.LastAttemptAt,
+		&job.Priority,
+		&job.RetryCount,
+		&job.ScheduledTime,
+		&job.Status,
+		&job.Type,
+		&job.Payload,
+	)
+	if err != nil {
+		logger.Error("failed to scan query result", "err", err.Error())
+		return nil, errors.New(common.ErrDBOperationFailed)
+	}
+	return &job, nil
 }
 
 func (this *JobRepository) SaveDefaultJob(ctx context.Context, job *model.Job) (*model.Job, error) {

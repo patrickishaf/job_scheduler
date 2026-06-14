@@ -33,11 +33,15 @@ func main() {
 
 	service := app.CreateService(redisCache, dlqRepo, jobRepo, socketConnStore, logger)
 
-	heapScheduler := app.CreateHeapScheduler()
-	ipqScheduler := app.CreateIndexedPQScheduler()
+	heapScheduler := app.NewHeapScheduler()
+	ipqScheduler := app.NewIndexedPQScheduler()
 
-	worker := app.CreateWorker(&cfg.App, service, heapScheduler, ipqScheduler, logger)
-	go worker.Start()
+	worker := app.CreateWorker(&cfg.App, heapScheduler, ipqScheduler, jobRepo, socketConnStore, logger)
+	queueWorker := app.CreateQueueWorker(&cfg.App, heapScheduler, ipqScheduler, socketConnStore, logger)
+	workerCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go worker.Start(workerCtx)
+	go queueWorker.Start(workerCtx)
 
 	httpHandler := app.CreateHTTPHandler(service, logger)
 	socketHandler := app.CreateSocketHandler(&cfg.Socket, service, logger)

@@ -1,56 +1,95 @@
 package app
 
 import (
+	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/patrickishaf/job_scheduler/config"
+	"github.com/patrickishaf/job_scheduler/internal/db/repository"
+	"github.com/patrickishaf/job_scheduler/internal/net"
 )
 
 type Worker struct {
-	cfg           *config.AppConfig
-	logger        *slog.Logger
-	srv           *service
-	heapScheduler *HeapScheduler
-	ipqScheduler  *IndexedPQScheduler
-	ticker        *time.Ticker
+	cfg             *config.AppConfig
+	logger          *slog.Logger
+	heapScheduler   *HeapScheduler
+	ipqScheduler    *IndexedPQScheduler
+	jobsRepo        *repository.JobRepository
+	socketConnStore *net.SocketConnectionStore
+	ticker          *time.Ticker
 }
 
 func CreateWorker(
 	cfg *config.AppConfig,
-	srv *service,
 	heapScheduler *HeapScheduler,
 	ipqScheduler *IndexedPQScheduler,
+	jobsRepo *repository.JobRepository,
+	socketStroe *net.SocketConnectionStore,
 	logger *slog.Logger,
 ) *Worker {
 	return &Worker{
-		cfg:           cfg,
-		logger:        logger,
-		srv:           srv,
-		heapScheduler: heapScheduler,
-		ipqScheduler:  ipqScheduler,
-		ticker:        nil,
+		cfg:             cfg,
+		logger:          logger,
+		heapScheduler:   heapScheduler,
+		ipqScheduler:    ipqScheduler,
+		jobsRepo:        jobsRepo,
+		socketConnStore: socketStroe,
+		ticker:          nil,
 	}
 }
 
-func (this *Worker) processJob() {
-	/**
-	 * An interval job is a job whose value of interval is not null
-		* Get the next interval job with status == pending and retry_count < cfg.MaxJobRetryCount and scheduled_time <= time.Now
-		* update the job status to processing
-		* update attempt_count to +1
-		* if attempt_count > 0 update retry count to +1.
-		* process processJob
-		* if successful, update job status to successful
-		* if failed and MaxRetryCount == cfg.MaxJobRetryCount, add to dead letter queue and delete job
-		* if failed, increment retry count and
-	*/
+func (this *Worker) processJob(ctx context.Context) {
+	logger := this.logger.With("caller", "Worker.processJob")
+
+	jobModels, err := this.jobsRepo.FindAllPendingJobs(ctx)
+	if err != nil {
+		logger.Error("failed to get all pending jobs by status", "err", err.Error())
+		return
+	}
+
+	if len(jobModels) == 0 {
+		logger.Info("found no pending jobs")
+		return
+	}
+
+	var jobs []*Job
+	for _, j := range jobModels {
+		job := CreateJobFromModel(&j)
+		jobs = append(jobs, job)
+	}
+
+	jobIDMap := this.ipqScheduler.EnqueueDueJobs(jobs)
+
+	if len(jobIDMap) == 0 {
+		logger.Error("failed to queue all jobs")
+		return
+	}
+
+	var wg sync.WaitGroup
+	for _, job := range jobModels {
+		wg.Go(func() {
+			_, exists := jobIDMap[job.ID]
+			if exists {
+				logger.Info("broadcasting socket message")
+				this.socketConnStore.BroadcastMessage(&net.SocketMessage{
+					Event: net.SOCKET_EVENT_JOB_QUEUED,
+				})
+				_, err = this.jobsRepo.MarkJobAsProcessing(ctx, job.ID, int(job.AttemptCount)+1, job.RetryCount+1)
+				if err != nil {
+					logger.Info("failed to mark job as processing", "job_id", job.ID, "err", err.Error())
+				}
+			}
+		})
+	}
+	wg.Wait()
 }
 
-func (this *Worker) Start() error {
-	this.ticker = time.NewTicker(1 * time.Second / 2)
+func (this *Worker) Start(ctx context.Context) error {
+	this.ticker = time.NewTicker(10 * time.Second)
 	for range this.ticker.C {
-		go this.processJob()
+		go this.processJob(ctx)
 	}
 	return nil
 }
